@@ -262,10 +262,8 @@ func main() {
 		}
 	}
 
-	// Generate markdown
 	markdown := generateMarkdown(includeHeader, ip, scans)
 
-	// Output
 	if outputFile != "" {
 		err := os.WriteFile(outputFile, []byte(markdown), 0644)
 		if err != nil {
