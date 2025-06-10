@@ -245,7 +245,6 @@ func main() {
 		}
 		scans = append(scans, scan)
 
-		// Extract IP if not already found
 		if ip == "" {
 			ip = extractIPFromFile(filename)
 		}
