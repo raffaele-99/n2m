@@ -72,12 +72,12 @@ func parseNmapFile(filename string) (*NmapScan, error) {
 					Service:  strings.TrimSpace(matches[4]),
 					Version:  "",
 				}
-				
+
 				// If there's version info (5th capture group)
 				if len(matches) > 5 && matches[5] != "" {
 					port.Version = strings.TrimSpace(matches[5])
 				}
-				
+
 				if port.State == "open" {
 					scan.Ports = append(scan.Ports, port)
 				}
@@ -87,29 +87,10 @@ func parseNmapFile(filename string) (*NmapScan, error) {
 
 	scan.Output = strings.TrimSpace(output.String())
 
-	// Determine scan type from command flags
-	scanType := ""
-	
-	// Check port range
-	if strings.Contains(scan.Command, "-p-") {
-		scanType = "All"
-	} else {
-		scanType = "Top 1000"
+	// Determine scan type from command
+	if scan.Command != "" {
+		scan.Type = determineScanType(scan.Command)
 	}
-	
-	// Check if it's a script scan
-	if strings.Contains(scan.Command, "-sC") || strings.Contains(scan.Command, "-sV") {
-		scanType += " Script Scan"
-	}
-	
-	// Check protocol
-	if strings.Contains(scan.Command, "-sU") {
-		scanType += " UDP"
-	} else {
-		scanType += " TCP"
-	}
-	
-	scan.Type = scanType
 
 	return scan, scanner.Err()
 }
@@ -123,10 +104,17 @@ func extractIPFromFile(filename string) string {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	ipRegex := regexp.MustCompile(`Nmap scan report for (\d+\.\d+\.\d+\.\d+)`)
+	ipRegex := regexp.MustCompile(`Nmap scan report for (?:.*?\()?(\d+\.\d+\.\d+\.\d+)\)?`)
+	hostnameRegex := regexp.MustCompile(`Nmap scan report for ([^\s]+)`)
 
 	for scanner.Scan() {
-		if matches := ipRegex.FindStringSubmatch(scanner.Text()); matches != nil {
+		line := scanner.Text()
+		// Try IP regex first
+		if matches := ipRegex.FindStringSubmatch(line); matches != nil {
+			return matches[1]
+		}
+		// Fall back to hostname
+		if matches := hostnameRegex.FindStringSubmatch(line); matches != nil {
 			return matches[1]
 		}
 	}
@@ -140,16 +128,27 @@ func extractIPFromFile(filename string) string {
 	return ""
 }
 
-func generateMarkdown(ip string, scans []*NmapScan) string {
+func generateMarkdown(includeHeader bool, ip string, scans []*NmapScan) string {
 	var output strings.Builder
 
 	// Header
-	output.WriteString(fmt.Sprintf("# %s\n\n", ip))
-	output.WriteString("# nmap\n")
+	if includeHeader {
+		output.WriteString(fmt.Sprintf("# %s\n\n", ip))
+		output.WriteString("# nmap\n")
+	}
 
 	// Add each scan type
 	for _, scan := range scans {
 		output.WriteString(fmt.Sprintf("## %s\n\n", scan.Type))
+
+		// Add command in its own code block
+		if scan.Command != "" {
+			output.WriteString("```bash\n")
+			output.WriteString(scan.Command)
+			output.WriteString("\n```\n\n")
+		}
+
+		// Add scan output
 		output.WriteString("```\n")
 		output.WriteString(scan.Output)
 		output.WriteString("\n```\n\n")
@@ -185,7 +184,7 @@ func generateMarkdown(ip string, scans []*NmapScan) string {
 			num2 := 0
 			fmt.Sscanf(ports[j].Number, "%d", &num1)
 			fmt.Sscanf(ports[j+1].Number, "%d", &num2)
-			
+
 			// Sort by number first, then by protocol (TCP before UDP)
 			if num1 > num2 || (num1 == num2 && ports[j].Protocol > ports[j+1].Protocol) {
 				ports[j], ports[j+1] = ports[j+1], ports[j]
@@ -204,14 +203,14 @@ func generateMarkdown(ip string, scans []*NmapScan) string {
 			// Remove the question mark for uncertain services
 			serviceName = strings.TrimSuffix(serviceName, "?")
 		}
-		
-		output.WriteString(fmt.Sprintf("# %s/%s (%s)\n", port.Number, port.Protocol, serviceName))
-		
+
+		output.WriteString(fmt.Sprintf("# %s/%s (%s)\n", port.Number, strings.ToLower(port.Protocol), serviceName))
+
 		// Add version info if available
 		if port.Version != "" {
 			output.WriteString(fmt.Sprintf("**Version:** %s\n\n", port.Version))
 		}
-		
+
 		output.WriteString("Manual investigation notes for this port go here\n\n")
 	}
 
@@ -220,14 +219,17 @@ func generateMarkdown(ip string, scans []*NmapScan) string {
 
 func main() {
 	var outputFile string
+	var includeHeader bool
 	flag.StringVar(&outputFile, "o", "", "Output markdown file (optional)")
+	flag.BoolVar(&includeHeader, "header", false, "include a header with the IP address in the output (default: false)")
 	flag.Parse()
 
 	if len(flag.Args()) == 0 {
-		fmt.Println("Usage: n2m [-o output.md] <nmap-file1> [nmap-file2] ...")
+		fmt.Println("Usage: n2m [-o output.md] [-header] <nmap-file1> [nmap-file2] ...")
 		fmt.Println("\nExample:")
 		fmt.Println("  n2m all-tcp.nmap")
 		fmt.Println("  n2m -o 10.10.11.174.md all-tcp.nmap top-1000-tcp-script-scan.nmap udp-1000.nmap")
+		fmt.Println("  n2m -header -o results.md *.nmap")
 		os.Exit(1)
 	}
 
@@ -255,12 +257,14 @@ func main() {
 	}
 
 	if ip == "" {
-		fmt.Fprintln(os.Stderr, "Could not extract IP address from nmap files")
-		os.Exit(1)
+		if includeHeader {
+			fmt.Fprintln(os.Stderr, "Warning: No IP address found in nmap files, using 'Unknown' in header")
+			ip = "Unknown"
+		}
 	}
 
 	// Generate markdown
-	markdown := generateMarkdown(ip, scans)
+	markdown := generateMarkdown(includeHeader, ip, scans)
 
 	// Output
 	if outputFile != "" {
