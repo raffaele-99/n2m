@@ -17,14 +17,15 @@ go.work
 # Dependency directories
 vendor/
 
-# Build directories
+# Build directories (from Makefile)
+bin/
 dist/
 releases/
 build/
 
-# Binary name (in case you build locally)
-testcreds
-testcreds-*
+# Binary name
+n2m
+n2m-*
 
 # IDE specific files
 .idea/
@@ -32,7 +33,11 @@ testcreds-*
 *.swp
 *.swo
 *~
+
+# OS generated files
 .DS_Store
+Thumbs.db
+desktop.ini
 
 # Environment variables
 .env
@@ -47,15 +52,17 @@ testcreds-*
 debug
 __debug_bin*
 
-# OS generated files
-Thumbs.db
-.DS_Store
-desktop.ini
-
 # Archives (from build process)
 *.tar.gz
 *.zip
 
-# Checksums file (generated during build)
+# Checksums file
 checksums.txt
 SHA256SUMS
+
+# Nmap output files (for testing)
+*.nmap
+
+# Generated markdown files (for testing)
+*.md
+!README.md
