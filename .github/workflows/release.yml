@@ -42,61 +42,12 @@ jobs:
         GOOS=windows GOARCH=arm64 go build -o dist/n2m-windows-arm64.exe ${SOURCE_FILES}
         GOOS=freebsd GOARCH=amd64 go build -o dist/n2m-freebsd-amd64 ${SOURCE_FILES}
     
-    - name: Create archives
-      run: |
-        cd dist
-        # Create tar.gz for non-Windows
-        for file in n2m-*; do
-          if [[ ! "$file" =~ \.exe$ ]]; then
-            tar -czf "${file}.tar.gz" "$file"
-          fi
-        done
-        
-        # Create zip for Windows
-        for file in n2m-*.exe; do
-          zip "${file%.exe}.zip" "$file"
-        done
-        
-        # Generate checksums
-        sha256sum *.tar.gz *.zip > checksums.txt
-    
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          dist/*.tar.gz
-          dist/*.zip
-          dist/checksums.txt
+        files: dist/n2m-*
         body: |
           ## n2m ${{ github.ref_name }}
           
-          vibe coded go tool that makes markdown notes from nmap output. only supports nmap -oN format
-          
-          ### install
-          download appropriate release and add to path
-          
-          ### build
-          ```bash
-          git clone https://github.com/raffaele-99/n2m.git
-          cd n2m
-          make install
-          ```
-          
-          ### usage
-          ```
-          n2m [-o output.md] [-header] <nmap-file1> [nmap-file2] ...
-          
-          Usage:
-            -header
-                  prepend a top-level header with the host's IP address (default: false)
-            -o string
-                  output markdown file (optional)
-          
-          Example:
-            n2m all-tcp.nmap
-            n2m -o 10.10.11.174.md all-tcp.nmap top-1000-tcp-script-scan.nmap udp-1000.nmap
-            n2m -header -o results.md *.nmap
-          ```
-          
           ### changes
-          none , first version
+          - first release
