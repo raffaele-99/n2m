@@ -220,8 +220,8 @@ func generateMarkdown(includeHeader bool, ip string, scans []*NmapScan) string {
 func main() {
 	var outputFile string
 	var includeHeader bool
-	flag.StringVar(&outputFile, "o", "", "Output markdown file (optional)")
-	flag.BoolVar(&includeHeader, "header", false, "include a header with the IP address in the output (default: false)")
+	flag.StringVar(&outputFile, "o", "", "output markdown file (optional)")
+	flag.BoolVar(&includeHeader, "header", false, "prepend a top-level header with the host's IP address (default: false)")
 	flag.Parse()
 
 	if len(flag.Args()) == 0 {
